@@ -1,11 +1,15 @@
+require("keymaps")
+require("options")
 require("config.lazy")
-local builtin = require('telescope.builtin')
+require("config.keymaps")
 
-vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = 'Telescope find files' })
-vim.keymap.set('n', '<leader>fg', builtin.live_grep, { desc = 'Telescope live grep' })
-vim.keymap.set('n', '<leader>fb', builtin.buffers, { desc = 'Telescope buffers' })
-vim.keymap.set('n', '<leader>fh', builtin.help_tags, { desc = 'Telescope help tags' })
+vim.diagnostic.config({
+  -- Use the default configuration
+  virtual_lines = true
 
-vim.cmd('hi Normal ctermbg=NONE guibg=NONE')
-vim.cmd('hi NonText ctermbg=NONE guibg=NONE')
-
+  -- Alternatively, customize specific options
+  -- virtual_lines = {
+  --  -- Only show virtual line diagnostics for the current cursor line
+  --  current_line = true,
+  -- },
+})
