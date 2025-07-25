@@ -1,0 +1,112 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Taskfile is installed! Start configuring your environment. try tl<enter> to list available tasks
+
+tasks:
+  default:
+    cmds:
+      - echo "{{.GREETING}}"
+    silent: true
+
+  01-install_chrome:
+    cmds:
+      - cd ~
+      - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+      - sudo dpkg -i google-chrome-stable_current_amd64.deb
+      - sudo apt-get install -f
+
+  02-install_temurin:
+    cmds:
+      - sudo apt install -y wget apt-transport-https
+      - wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor |sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
+      - echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+      - sudo apt update
+      - sudo apt install temurin-23-jdk
+  03-setup_ssh:
+    cmds:
+      - ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_ed25519 <<< y
+      - ssh-keygen -q -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa <<< y
+      - echo "Created your SSH keys at ~/.ssh/id_rsa"
+      - echo "Your public key is "
+      - cat ~/.ssh/id_rsa.pub
+      - echo "Go add this key to Azure DevOps to allow ssh connections to the git repos"
+      - echo "https://dev.azure.com/foc-poc/_usersSettings/keys"
+
+  04-run_vscode:
+    cmds:
+      - cd ~
+      - code .
+
+  05-install_docker:
+    cmds:
+      - sudo apt-get update
+      - sudo apt-get install ca-certificates curl
+      - sudo install -m 0755 -d /etc/apt/keyrings
+      - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      - sudo chmod a+r /etc/apt/keyrings/docker.asc
+      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      - sudo apt-get update
+      - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      - sudo docker run hello-world
+
+  06-install_azure_CLI:
+    cmds:
+      - curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+      - echo "Logging into Azure... Click the link below to login. When asked, select aks-dev"
+      - az login --use-device-code
+
+  07-install_homebrew:
+    cmds:
+      - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      - echo >> ~/.bashrc
+      - echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+      - eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+      - sudo apt-get install build-essential
+
+  08-install_k8s_tools:
+    cmds:
+      - sudo apt-get update
+      - sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+      - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      - sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
+      - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+      - sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
+      - sudo apt-get update
+      - sudo apt-get install -y kubectl
+      - brew install derailed/k9s/k9s
+
+  09-connect_aks_dev:
+    cmds:
+      - echo "Getting credentials for aks-dev cluster. This will only work if you selected aks-dev when you logged in earlier."
+      - echo "otherwise log in again using az login --use-device-code"
+      - az aks get-credentials -g aks-dev-rg --name aks-dev
+      - echo "Now kubectl and k9s should work "
+      - kubectl get pods -n cfis
+      - echo "Verify the kubectl output and press any key to continue to k9s"
+      - bash -c "read -n 1 -s"
+      - k9s -n cfis
+  10-install_intellij:
+    cmds:
+      #- wget https://download.jetbrains.com/idea/ideaIU-2025.1.4.1.tar.gz
+      #- mv ideaIU*.tar.gz ~
+      #- cd ~ ; tar -xzvf ideaIU*.tar.gz
+      - echo "IntelliJ installed, press enter to launch and log in to activate licence"
+      - bash -c "read -n 1 -s"
+      - ~/idea-IU-*/bin/idea.sh
+  11-install_node:
+    cmds:
+      - sudo apt remove -y nodejs
+      - sudo apt install -y curl
+      - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      - bash -c '
+          export NVM_DIR="$HOME/.nvm";
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh";
+          [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion";
+          nvm install --lts;
+          nvm use --lts;
+          node -v
+        '
+      - echo "nvm and node installation complete. Please verify version above."
