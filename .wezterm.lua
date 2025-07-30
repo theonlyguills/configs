@@ -4,7 +4,7 @@ local wezterm = require 'wezterm'
 -- This will hold the configuration.
 local config = wezterm.config_builder()
 
-config.default_domain = 'WSL:Ubuntu-24.04'
+config.default_domain = 'WSL:Ubuntu-CFIS'
 
 config.color_scheme = 'gogh'
 
