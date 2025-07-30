@@ -15,7 +15,8 @@ tasks:
     cmds:
       - cd ~
       - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-      - sudo dpkg -i google-chrome-stable_current_amd64.deb
+      - cmd: sudo dpkg -i google-chrome-stable_current_amd64.deb
+        ignore_error: true
       - sudo apt-get install -f
 
   02-install_temurin:
