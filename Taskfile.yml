@@ -64,6 +64,8 @@ tasks:
       - sudo apt-get update
       - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - sudo docker run hello-world
+      - sudo usermod -aG docker $USER
+      - echo "docker is installed and you added yourself to the docker group. Exit this shell to re-login and get the docker group.
 
   06-install_azure_CLI:
     cmds:
@@ -78,6 +80,8 @@ tasks:
       - echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
       - eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
       - sudo apt-get install build-essential
+      - echo "Don't forget to run source ~/.bashrc in order to get access to brew from this terminal, or exit and come back"
+      - echo "To test that this worked, just run 'brew'"
 
   08-install_k8s_tools:
     cmds:
@@ -88,8 +92,9 @@ tasks:
       - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
       - sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
       - sudo apt-get update
-      - sudo apt-get install -y kubectl
+      - sudo apt-get install -y kubectl kubectx
       - brew install derailed/k9s/k9s
+      - brew install Azure/kubelogin/kubelogin
 
   09-connect_aks_dev:
     cmds:
@@ -103,9 +108,9 @@ tasks:
       - k9s -n cfis
   10-install_intellij:
     cmds:
-      #- wget https://download.jetbrains.com/idea/ideaIU-2025.1.4.1.tar.gz
-      #- mv ideaIU*.tar.gz ~
-      #- cd ~ ; tar -xzvf ideaIU*.tar.gz
+      - wget https://download.jetbrains.com/idea/ideaIU-2025.1.4.1.tar.gz
+      - mv ideaIU*.tar.gz ~
+      - cd ~ ; tar -xzvf ideaIU*.tar.gz
       - echo "IntelliJ installed, press enter to launch and log in to activate licence"
       - bash -c "read -n 1 -s"
       - ~/idea-IU-*/bin/idea.sh
