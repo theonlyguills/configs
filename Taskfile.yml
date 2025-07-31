@@ -3,8 +3,20 @@
 version: '3'
 
 vars:
-  GREETING: Taskfile is installed! Start configuring your environment. try tl<enter> to list available tasks
+  GREETING: |
+    ✅ Taskfile is installed and ready!
+    Don't forget to run 'source ~/.bashrc' to get access to the aliases set up
 
+    Change to your ~/configs directory (cd ~/configs) first, then
+
+    👉 Run 'tl' to list all available tasks (alias for 'task --list-all')
+    🚀 Use 't taskname' to run any task (alias for 'task taskname')
+
+    🛠️ Example:
+        tl             # lists all tasks
+        t setup-env    # runs the 'setup-env' task
+
+    Have fun and configure your dev environment!
 tasks:
   default:
     cmds:
