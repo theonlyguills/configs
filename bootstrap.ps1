@@ -1,4 +1,4 @@
-$removeGit = $false
+$removeGit = $true
 $desiredDistro = "Ubuntu-CFIS"
 $profile = $env:USERPROFILE
 
