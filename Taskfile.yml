@@ -65,7 +65,7 @@ tasks:
       - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - sudo docker run hello-world
       - sudo usermod -aG docker $USER
-      - echo "docker is installed and you added yourself to the docker group. Exit this shell to re-login and get the docker group.
+      - echo "docker is installed and you added yourself to the docker group. Exit this shell to re-login and get the docker group."
 
   06-install_azure_CLI:
     cmds:
@@ -80,8 +80,9 @@ tasks:
       - echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
       - eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
       - sudo apt-get install build-essential
-      - echo "Don't forget to run source ~/.bashrc in order to get access to brew from this terminal, or exit and come back"
-      - echo "To test that this worked, just run 'brew'"
+      - echo "🚀"
+      - echo "🚀  Don't forget to run source ~/.bashrc in order to get access to brew from this terminal, or exit and come back"
+      - echo "🚀  To test that this worked, just run 'brew'"
 
   08-install_k8s_tools:
     cmds:

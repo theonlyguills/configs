@@ -68,7 +68,7 @@ Copy-Item -Path configs\.wezterm.lua -Destination $profile\.wezterm.lua -Force
 Write-Host ""
 Write-Host "Launching Ubuntu, once you get to the command prompt, type exit to come back here." -ForegroundColor Red
 Read-Host -Prompt "Press Enter to continue"
-Start-Process wezterm.exe
+Start-Process "C:\Program Files\WezTerm\wezterm.exe"
 
 Read-Host -Prompt "AFTER your user and password is entered in WSL, and you exited, press Enter to continue"
 
@@ -77,4 +77,4 @@ wsl -d $desiredDistro cp /tmp/bootstrap.sh ~
 wsl -d $desiredDistro chmod +x ~/bootstrap.sh
 
 Read-Host -Prompt "wezterm will launch again. at the terminal, launch ~/bootstrap.sh. press Enter to continue"
-Start-Process wezterm.exe
+Start-Process "C:\Program Files\WezTerm\wezterm.exe"
