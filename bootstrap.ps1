@@ -2,6 +2,8 @@ $removeGit = $true
 $desiredDistro = "Ubuntu-CFIS"
 $profile = $env:USERPROFILE
 
+Set-Location $profile
+
 # Check for administrator privileges
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
     [Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -72,7 +74,7 @@ Start-Process "C:\Program Files\WezTerm\wezterm.exe"
 
 Read-Host -Prompt "AFTER your user and password is entered in WSL, and you exited, press Enter to continue"
 
-Copy-Item -Path configs\bootstrap.sh -Destination "\\wsl$\Ubuntu-CFIS\tmp\bootstrap.sh" -Force
+wsl -d Ubuntu-CFIS wget https://raw.githubusercontent.com/theonlyguills/configs/refs/heads/master/bootstrap.sh -O /tmp/bootstrap.sh
 wsl -d $desiredDistro cp /tmp/bootstrap.sh ~
 wsl -d $desiredDistro chmod +x ~/bootstrap.sh
 
