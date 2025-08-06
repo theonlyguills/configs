@@ -13,6 +13,6 @@ save bootstrap.ps1 in user profile folder (C:\Users\fill_in_your_profile)
 
 Execute the following in a ADMIN power shell while in your user profile folder:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
+Unblock-File -Path .\bootstrap.ps1
 bootstrap.ps1
 
