@@ -137,8 +137,8 @@ Write-Host ""
 # Launch wezterm with the bootstrap script
 Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
 
-# Copy the add-bootstrap script from configs and run it
-wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/add-bootstrap-to-bashrc.sh /tmp/ && bash /tmp/add-bootstrap-to-bashrc.sh"
+# Copy the script and convert line endings with dos2unix
+wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/add-bootstrap-to-bashrc.sh /tmp/ && dos2unix /tmp/add-bootstrap-to-bashrc.sh 2>/dev/null && bash /tmp/add-bootstrap-to-bashrc.sh"
 
 Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
 $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"

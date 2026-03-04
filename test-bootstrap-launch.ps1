@@ -75,8 +75,8 @@ chmod +x /tmp/run-bootstrap.sh
     # Add a one-time command to .bashrc that will run bootstrap.sh
     Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
     
-    # Copy the add-bootstrap script from configs and run it
-    wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/add-bootstrap-to-bashrc.sh /tmp/ && bash /tmp/add-bootstrap-to-bashrc.sh"
+    # Copy the script and convert line endings with dos2unix
+    wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/add-bootstrap-to-bashrc.sh /tmp/ && dos2unix /tmp/add-bootstrap-to-bashrc.sh 2>/dev/null && bash /tmp/add-bootstrap-to-bashrc.sh"
     
     Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
     # Just launch WezTerm - it will use the default distro from .wezterm.lua
