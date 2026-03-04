@@ -137,29 +137,25 @@ Write-Host ""
 # Launch wezterm with the bootstrap script
 Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
 
-# Create a temp script file to avoid escaping issues
-$tempScript = @"
-if ! grep -q "BOOTSTRAP_AUTO_RUN" ~/.bashrc 2>/dev/null; then
-    cat >> ~/.bashrc << 'EOFMARKER'
+# Check if already added
+$alreadyAdded = wsl -d $desiredDistro bash -c 'grep -q "BOOTSTRAP_AUTO_RUN" ~/.bashrc 2>/dev/null && echo "yes" || echo "no"'
 
-# BOOTSTRAP_AUTO_RUN - This will be removed automatically
-if [ -f ~/bootstrap.sh ]; then
-    echo ""
-    echo "==========================================="
-    echo "Running CFIS development environment setup..."
-    echo "==========================================="
-    echo ""
-    ~/bootstrap.sh
-fi
-EOFMARKER
-    echo "Added to .bashrc"
-else
-    echo "Already in .bashrc"
-fi
-"@
-
-# Write to temp file and execute
-$tempScript | wsl -d $desiredDistro bash -c 'cat > /tmp/add-bashrc.sh && bash /tmp/add-bashrc.sh'
+if ($alreadyAdded -match "no") {
+    # Add each line individually to avoid heredoc issues
+    wsl -d $desiredDistro bash -c 'echo "" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "# BOOTSTRAP_AUTO_RUN - This will be removed automatically" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "if [ -f ~/bootstrap.sh ]; then" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    echo \"\"" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    echo \"===========================================\"" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    echo \"Running CFIS development environment setup...\"" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    echo \"===========================================\"" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    echo \"\"" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "    ~/bootstrap.sh" >> ~/.bashrc'
+    wsl -d $desiredDistro bash -c 'echo "fi" >> ~/.bashrc'
+    Write-Host "Added to .bashrc" -ForegroundColor Green
+} else {
+    Write-Host "Already in .bashrc" -ForegroundColor Yellow
+}
 
 Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
 $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
