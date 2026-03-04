@@ -223,8 +223,10 @@ tasks:
     deps: [07-install_homebrew]
     cmds:
       - |
-        # Ensure brew is available
-        if command -v brew &> /dev/null; then
+        # Ensure brew is available (source it directly since it might not be in PATH yet)
+        if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        elif command -v brew &> /dev/null; then
           eval "$(brew shellenv)"
         fi
         
