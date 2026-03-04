@@ -364,6 +364,76 @@ tasks:
         echo ""
         echo "⚠️  Run 'source ~/.bashrc' or restart your shell to use nvm/node"
 
+  12-clone_cfis_repos:
+    desc: "Clone all CFIS repositories from Azure DevOps"
+    deps: [03-setup_ssh]
+    cmds:
+      - |
+        echo "📦 Cloning CFIS repositories..."
+        echo ""
+        
+        # Define all CFIS repos
+        REPOS=(
+          "CFIS-core"
+          "CFIS-infra"
+          "CFIS-CE.wiki"
+          "ce-api"
+          "ce-carrier"
+          "ce-common"
+          "ce-webui"
+          "cdm-api"
+          "cdm-webui"
+          "cfis-ce-config"
+          "cfis-qa"
+          "horizon-api"
+          "horizon-ui"
+        )
+        
+        AZURE_ORG="foc-poc"
+        AZURE_PROJECT="CFIS-CE"
+        
+        CLONED=0
+        SKIPPED=0
+        FAILED=0
+        
+        cd ~
+        
+        for repo in "${REPOS[@]}"; do
+          if [ -d "$repo" ]; then
+            echo "⏭️  $repo already exists"
+            SKIPPED=$((SKIPPED + 1))
+          else
+            echo "📥 Cloning $repo..."
+            if git clone "git@ssh.dev.azure.com:v3/$AZURE_ORG/$AZURE_PROJECT/$repo" 2>&1; then
+              echo "✅ $repo cloned successfully"
+              CLONED=$((CLONED + 1))
+            else
+              echo "❌ Failed to clone $repo"
+              FAILED=$((FAILED + 1))
+            fi
+          fi
+        done
+        
+        echo ""
+        echo "=========================================="
+        echo "Repository Clone Summary"
+        echo "=========================================="
+        echo "✅ Cloned: $CLONED"
+        echo "⏭️  Skipped (already exist): $SKIPPED"
+        echo "❌ Failed: $FAILED"
+        echo ""
+        
+        if [ $FAILED -gt 0 ]; then
+          echo "⚠️  Some repositories failed to clone."
+          echo "   Make sure your SSH key is added to Azure DevOps:"
+          echo "   https://dev.azure.com/foc-poc/_usersSettings/keys"
+          exit 1
+        elif [ $SKIPPED -eq ${#REPOS[@]} ]; then
+          echo "✅ All repositories already present in ~/"
+        else
+          echo "✅ All CFIS repositories ready in ~/"
+        fi
+
   verify-setup:
     desc: "Check which tools are installed"
     cmds:
@@ -501,6 +571,7 @@ tasks:
         echo "   - VSCode WSL-optimized alias"
         echo ""
         echo "Optional next steps:"
-        echo "   • task 09-connect_aks_dev - Connect to AKS cluster"
+        echo "   • task 09-connect_aks_dev    - Connect to AKS cluster"
+        echo "   • task 12-clone_cfis_repos   - Clone all CFIS repositories"
         echo ""
         echo "Run 'task verify-setup' to see installation status"
