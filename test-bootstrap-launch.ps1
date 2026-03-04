@@ -91,8 +91,8 @@ fi
 "@
     
     Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
-    # Just launch WezTerm normally - it will start WSL and .bashrc will run bootstrap.sh
-    Start-Process -FilePath $weztermPath -ArgumentList "start"
+    # Launch WezTerm with specific distro override (since .wezterm.lua defaults to Ubuntu-CFIS)
+    Start-Process -FilePath $weztermPath -ArgumentList "start", "--", "wsl", "-d", "$desiredDistro"
     
     Write-Host ""
     Write-Host "✅ WezTerm launched!" -ForegroundColor Green

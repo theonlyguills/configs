@@ -87,6 +87,7 @@ if ($LASTEXITCODE -ne 0) {
     
     # Launch WezTerm for initial user setup - it will close when setup completes
     $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
+    # Override default distro from .wezterm.lua
     & $weztermPath start -- wsl -d $desiredDistro
     
     # Wait for user to complete setup
