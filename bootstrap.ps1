@@ -137,10 +137,10 @@ Write-Host ""
 # Launch wezterm with the bootstrap script
 Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
 
-# Use a heredoc in bash to avoid escaping issues
-wsl -d $desiredDistro bash -c @'
+# Create a temp script file to avoid escaping issues
+$tempScript = @"
 if ! grep -q "BOOTSTRAP_AUTO_RUN" ~/.bashrc 2>/dev/null; then
-    cat >> ~/.bashrc << 'EOF'
+    cat >> ~/.bashrc << 'EOFMARKER'
 
 # BOOTSTRAP_AUTO_RUN - This will be removed automatically
 if [ -f ~/bootstrap.sh ]; then
@@ -151,12 +151,15 @@ if [ -f ~/bootstrap.sh ]; then
     echo ""
     ~/bootstrap.sh
 fi
-EOF
+EOFMARKER
     echo "Added to .bashrc"
 else
     echo "Already in .bashrc"
 fi
-'@
+"@
+
+# Write to temp file and execute
+$tempScript | wsl -d $desiredDistro bash -c 'cat > /tmp/add-bashrc.sh && bash /tmp/add-bashrc.sh'
 
 Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
 $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
