@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Remove the auto-run marker from .bashrc (cleanup from PowerShell bootstrap)
+if grep -q '# BOOTSTRAP_AUTO_RUN' ~/.bashrc 2>/dev/null; then
+    sed -i '/# BOOTSTRAP_AUTO_RUN/,/^fi$/d' ~/.bashrc
+fi
+
 # Install neovim
 cd ~
 echo "Installing neovim, you will have to enter your password to sudo"
