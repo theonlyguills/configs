@@ -135,41 +135,34 @@ Write-Host "✅ Bootstrap script ready" -ForegroundColor Green
 Write-Host ""
 
 # Launch wezterm with the bootstrap script
-Write-Host "Launching WezTerm to run automated setup..." -ForegroundColor Yellow
+Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
+
+# Create the bashrc addition as a temp file first, then append it
+$bashrcAddition = @'
+
+# BOOTSTRAP_AUTO_RUN - This will be removed automatically
+if [ -f ~/bootstrap.sh ]; then
+    echo ""
+    echo "==========================================="
+    echo "Running CFIS development environment setup..."
+    echo "==========================================="
+    echo ""
+    ~/bootstrap.sh
+fi
+'@
+
+# Write to temp file in WSL
+$bashrcAddition | wsl -d $desiredDistro bash -c 'cat > /tmp/bootstrap-addition.txt'
+
+# Check if already added, if not append it
+wsl -d $desiredDistro bash -c 'if ! grep -q "BOOTSTRAP_AUTO_RUN" ~/.bashrc 2>/dev/null; then cat /tmp/bootstrap-addition.txt >> ~/.bashrc; echo "Added to .bashrc"; else echo "Already in .bashrc"; fi'
+
+Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
 $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
 
 if (Test-Path $weztermPath) {
-    # Create a wrapper script in WSL that will run bootstrap and keep shell open
-    wsl -d $desiredDistro bash -c @"
-cat > /tmp/run-bootstrap.sh << 'INNEREOF'
-#!/bin/bash
-echo ''
-echo '==========================================='
-echo 'Running CFIS development environment setup...'
-echo '==========================================='
-echo ''
-if [ -f ~/bootstrap.sh ]; then
-    ~/bootstrap.sh
-    EXITCODE=\$?
-    echo ''
-    if [ \$EXITCODE -eq 0 ]; then
-        echo '✅ Bootstrap script completed successfully'
-    else
-        echo '❌ Bootstrap script failed with exit code: '\$EXITCODE
-    fi
-else
-    echo '❌ bootstrap.sh not found in home directory'
-fi
-echo ''
-echo 'Shell will remain open. Press Ctrl+D or type exit to close.'
-exec bash
-INNEREOF
-chmod +x /tmp/run-bootstrap.sh
-"@
-
-    # Launch WezTerm with the wrapper script
-    # Use -- to separate WezTerm args from the command to execute
-    Start-Process -FilePath $weztermPath -ArgumentList "start", "--", "wsl", "-d", "$desiredDistro", "/tmp/run-bootstrap.sh"
+    # Just launch WezTerm - it will use the default distro from .wezterm.lua
+    Start-Process -FilePath $weztermPath -ArgumentList "start"
     
     Write-Host ""
     Write-Host "✅ WezTerm launched!" -ForegroundColor Green

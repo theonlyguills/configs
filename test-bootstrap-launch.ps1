@@ -74,21 +74,26 @@ chmod +x /tmp/run-bootstrap.sh
     # Launch WezTerm with the wrapper script
     # Add a one-time command to .bashrc that will run bootstrap.sh
     Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
-    wsl -d $desiredDistro bash -c @"
-# Add marker and bootstrap command to .bashrc
-if ! grep -q '# BOOTSTRAP_AUTO_RUN' ~/.bashrc; then
-    echo '' >> ~/.bashrc
-    echo '# BOOTSTRAP_AUTO_RUN - This will be removed automatically' >> ~/.bashrc
-    echo 'if [ -f ~/bootstrap.sh ]; then' >> ~/.bashrc
-    echo '    echo ""' >> ~/.bashrc
-    echo '    echo "==========================================="' >> ~/.bashrc
-    echo '    echo "Running CFIS development environment setup..."' >> ~/.bashrc
-    echo '    echo "==========================================="' >> ~/.bashrc
-    echo '    echo ""' >> ~/.bashrc
-    echo '    ~/bootstrap.sh' >> ~/.bashrc
-    echo 'fi' >> ~/.bashrc
+    
+    # Create the bashrc addition as a temp file first, then append it
+    $bashrcAddition = @'
+
+# BOOTSTRAP_AUTO_RUN - This will be removed automatically
+if [ -f ~/bootstrap.sh ]; then
+    echo ""
+    echo "==========================================="
+    echo "Running CFIS development environment setup..."
+    echo "==========================================="
+    echo ""
+    ~/bootstrap.sh
 fi
-"@
+'@
+    
+    # Write to temp file in WSL
+    $bashrcAddition | wsl -d $desiredDistro bash -c 'cat > /tmp/bootstrap-addition.txt'
+    
+    # Check if already added, if not append it
+    wsl -d $desiredDistro bash -c 'if ! grep -q "BOOTSTRAP_AUTO_RUN" ~/.bashrc 2>/dev/null; then cat /tmp/bootstrap-addition.txt >> ~/.bashrc; echo "Added to .bashrc"; else echo "Already in .bashrc"; fi'
     
     Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
     # Just launch WezTerm - it will use the default distro from .wezterm.lua
