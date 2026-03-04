@@ -71,9 +71,9 @@ INNEREOF
 chmod +x /tmp/run-bootstrap.sh
 "@
 
-    # Launch WezTerm with the wrapper script - use full path to wsl.exe
-    $wslPath = "C:\Windows\System32\wsl.exe"
-    Start-Process -FilePath $weztermPath -ArgumentList "start", "$wslPath", "-d", "$desiredDistro", "/tmp/run-bootstrap.sh"
+    # Launch WezTerm with the wrapper script
+    # Use -- to separate WezTerm args from the command to execute
+    Start-Process -FilePath $weztermPath -ArgumentList "start", "--", "wsl", "-d", "$desiredDistro", "/tmp/run-bootstrap.sh"
     
     Write-Host ""
     Write-Host "✅ WezTerm launched!" -ForegroundColor Green
