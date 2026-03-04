@@ -87,7 +87,8 @@ if ($LASTEXITCODE -ne 0) {
     
     # Launch WezTerm for initial user setup - it will close when setup completes
     $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
-    & $weztermPath start wsl.exe -d $desiredDistro
+    $wslPath = "C:\Windows\System32\wsl.exe"
+    & $weztermPath start $wslPath -d $desiredDistro
     
     # Wait for user to complete setup
     Write-Host ""
@@ -166,8 +167,9 @@ INNEREOF
 chmod +x /tmp/run-bootstrap.sh
 "@
 
-    # Launch WezTerm with the wrapper script
-    Start-Process -FilePath $weztermPath -ArgumentList "start", "wsl.exe", "-d", "$desiredDistro", "/tmp/run-bootstrap.sh"
+    # Launch WezTerm with the wrapper script - use full path to wsl.exe
+    $wslPath = "C:\Windows\System32\wsl.exe"
+    Start-Process -FilePath $weztermPath -ArgumentList "start", "$wslPath", "-d", "$desiredDistro", "/tmp/run-bootstrap.sh"
     
     Write-Host ""
     Write-Host "✅ WezTerm launched!" -ForegroundColor Green
