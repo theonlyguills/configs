@@ -11,10 +11,13 @@ vars:
 
     👉 Run 'tl' to list all available tasks (alias for 'task --list-all')
     🚀 Use 't taskname' to run any task (alias for 'task taskname')
+    🎯 Run 't setup-all' to run the complete setup from scratch
+    🔍 Run 't verify-setup' to check what's installed
 
     🛠️ Example:
         tl             # lists all tasks
         t setup-env    # runs the 'setup-env' task
+        t setup-all    # runs everything in order
 
     Have fun and configure your dev environment!
 tasks:
@@ -24,108 +27,480 @@ tasks:
     silent: true
 
   01-install_chrome:
+    desc: "Install Google Chrome browser"
     cmds:
-      - cd ~
-      - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-      - cmd: sudo dpkg -i google-chrome-stable_current_amd64.deb
-        ignore_error: true
-      - sudo apt-get install -f
+      - |
+        if command -v google-chrome &> /dev/null; then
+          echo "✅ Chrome already installed: $(google-chrome --version)"
+          exit 0
+        fi
+        echo "📦 Installing Chrome..."
+        cd ~
+        # Remove any existing Chrome .deb files to avoid .1, .2, etc. versions
+        rm -f google-chrome-stable_current_amd64.deb*
+        echo "Downloading Chrome (this may take a moment)..."
+        wget --show-progress https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        # Verify download completed (file should be ~100MB)
+        if [ ! -s google-chrome-stable_current_amd64.deb ] || [ $(stat -c%s google-chrome-stable_current_amd64.deb) -lt 1000000 ]; then
+          echo "❌ Download failed or file is too small. Please check your internet connection."
+          rm -f google-chrome-stable_current_amd64.deb
+          exit 1
+        fi
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || true
+        sudo apt-get install -f -y
+        rm -f google-chrome-stable_current_amd64.deb
+        echo "✅ Chrome installed successfully"
 
-  02-install_temurin:
+  02a-install_sdkman:
+    desc: "Install SDKMAN for Java/JVM tool management"
     cmds:
-      - sudo apt install -y wget apt-transport-https
-      - wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor |sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
-      - echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
-      - sudo apt update
-      - sudo apt install temurin-23-jdk
+      - |
+        if [ -d "$HOME/.sdkman" ]; then
+          echo "✅ SDKMAN already installed"
+          exit 0
+        fi
+        echo "📦 Installing SDKMAN prerequisites..."
+        sudo apt-get update -qq
+        sudo apt-get install -y zip unzip curl
+        echo "📦 Installing SDKMAN..."
+        curl -s "https://get.sdkman.io" | bash
+        if ! grep -q 'sdkman-init.sh' ~/.bashrc; then
+          echo '' >> ~/.bashrc
+          echo '# SDKMAN' >> ~/.bashrc
+          echo 'export SDKMAN_DIR="$HOME/.sdkman"' >> ~/.bashrc
+          echo '[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"' >> ~/.bashrc
+        fi
+        echo "✅ SDKMAN installed. Run 'source ~/.bashrc' or restart your shell"
+
+  02-install_java:
+    desc: "Install Java 25 (Temurin) via SDKMAN"
+    deps: [02a-install_sdkman]
+    cmds:
+      - |
+        # Source sdkman in a bash subshell to avoid shell compatibility issues
+        bash -c '
+        export SDKMAN_DIR="$HOME/.sdkman"
+        [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+        
+        if sdk list java 2>/dev/null | grep -q "25.*tem.*installed"; then
+          echo "✅ Java 25 (Temurin) already installed"
+          sdk current java
+          exit 0
+        fi
+        echo "📦 Installing Java 25 (Temurin) via SDKMAN..."
+        sdk install java 25-tem
+        sdk default java 25-tem
+        echo "✅ Java installed successfully"
+        java -version
+        '
   03-setup_ssh:
+    desc: "Generate SSH keys for git access"
     cmds:
-      - ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_ed25519 <<< y
-      - ssh-keygen -q -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa <<< y
-      - echo "Created your SSH keys at ~/.ssh/id_rsa"
-      - echo "Your public key is "
-      - cat ~/.ssh/id_rsa.pub
-      - echo "Go add this key to Azure DevOps to allow ssh connections to the git repos"
-      - echo "https://dev.azure.com/foc-poc/_usersSettings/keys"
+      - |
+        if [ -f ~/.ssh/id_ed25519 ] && [ -f ~/.ssh/id_rsa ]; then
+          echo "✅ SSH keys already exist"
+          echo "Your RSA public key:"
+          cat ~/.ssh/id_rsa.pub
+          exit 0
+        fi
+        echo "🔑 Generating SSH keys..."
+        mkdir -p ~/.ssh
+        [ ! -f ~/.ssh/id_ed25519 ] && ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/id_ed25519 <<< y
+        [ ! -f ~/.ssh/id_rsa ] && ssh-keygen -q -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa <<< y
+        echo "✅ Created your SSH keys"
+        echo "Your RSA public key:"
+        cat ~/.ssh/id_rsa.pub
+        echo ""
+        echo "👉 Add this key to Azure DevOps: https://dev.azure.com/foc-poc/_usersSettings/keys"
 
-  04-run_vscode:
+  04-install_vscode:
+    desc: "Install VSCode (Linux version) for WSL"
     cmds:
-      - cd ~
-      - code .
+      - |
+        # Check if Linux version is installed (exact package name match)
+        if dpkg -l 2>/dev/null | grep "^ii" | awk '{print $2}' | grep -q "^code$"; then
+          VER=$(dpkg -l 2>/dev/null | grep "^ii" | grep -w "code" | awk '{print $3}')
+          echo "✅ VSCode (Linux) already installed: $VER"
+          exit 0
+        fi
+        
+        # Warn if only Windows version is available
+        if command -v code &> /dev/null && [[ $(which code) == /mnt/* ]]; then
+          echo "⚠️  Windows VSCode detected, installing Linux version for better WSL integration..."
+        fi
+        
+        echo "📦 Installing VSCode for Linux..."
+        cd ~
+        # Add Microsoft GPG key and repository
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+        sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+        echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+        rm -f packages.microsoft.gpg
+        
+        # Install VSCode
+        sudo apt-get update -qq
+        sudo apt-get install -y code
+        
+        # Create alias for WSL-optimized launch
+        if ! grep -q "alias code=" ~/.bashrc; then
+          echo '' >> ~/.bashrc
+          echo '# VSCode for WSL with Wayland support' >> ~/.bashrc
+          echo 'alias code="code --enable-features=UseOzonePlatform --ozone-platform=wayland"' >> ~/.bashrc
+        fi
+        
+        echo "✅ VSCode installed successfully"
+        echo "   Run 'source ~/.bashrc' to enable WSL-optimized alias"
+        echo "   Or just run 'code .' to launch in current directory"
 
   05-install_docker:
+    desc: "Install Docker Engine and add user to docker group"
     cmds:
-      - sudo apt-get update
-      - sudo apt-get install ca-certificates curl
-      - sudo install -m 0755 -d /etc/apt/keyrings
-      - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-      - sudo chmod a+r /etc/apt/keyrings/docker.asc
-      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-      - sudo apt-get update
-      - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-      - sudo docker run hello-world
-      - sudo usermod -aG docker $USER
-      - echo "docker is installed and you added yourself to the docker group. Exit this shell to re-login and get the docker group."
+      - |
+        if command -v docker &> /dev/null; then
+          echo "✅ Docker already installed: $(docker --version)"
+          if groups | grep -q docker; then
+            echo "✅ User already in docker group"
+          else
+            echo "⚠️  Adding user to docker group..."
+            sudo usermod -aG docker $USER
+            echo "⚠️  You need to log out and back in for docker group to take effect"
+          fi
+          exit 0
+        fi
+        echo "📦 Installing Docker..."
+        sudo apt-get update -qq
+        sudo apt-get install -y ca-certificates curl
+        sudo install -m 0755 -d /etc/apt/keyrings
+        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        sudo chmod a+r /etc/apt/keyrings/docker.asc
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update -qq
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        sudo docker run hello-world
+        sudo usermod -aG docker $USER
+        echo "✅ Docker installed. Exit this shell to re-login and get docker group."
 
   06-install_azure_CLI:
+    desc: "Install Azure CLI and login"
     cmds:
-      - curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-      - echo "Logging into Azure... Click the link below to login. When asked, select aks-dev"
-      - az login --use-device-code
+      - |
+        if command -v az &> /dev/null; then
+          echo "✅ Azure CLI already installed: $(az version -o tsv | head -n1)"
+          if az account show &> /dev/null; then
+            echo "✅ Already logged into Azure: $(az account show --query user.name -o tsv)"
+            exit 0
+          else
+            echo "⚠️  Not logged in, initiating login..."
+          fi
+        else
+          echo "📦 Installing Azure CLI..."
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        fi
+        echo "🔐 Logging into Azure... Click the link below. When asked, select aks-dev"
+        az login --use-device-code
 
   07-install_homebrew:
+    desc: "Install Homebrew package manager"
     cmds:
-      - /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      - echo >> ~/.bashrc
-      - echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-      - eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-      - sudo apt-get install build-essential
-      - echo "🚀"
-      - echo "🚀  Don't forget to run source ~/.bashrc in order to get access to brew from this terminal, or exit and come back"
-      - echo "🚀  To test that this worked, just run 'brew'"
+      - |
+        if command -v brew &> /dev/null; then
+          echo "✅ Homebrew already installed: $(brew --version | head -n1)"
+          exit 0
+        fi
+        echo "📦 Installing Homebrew..."
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        if ! grep -q 'linuxbrew' ~/.bashrc; then
+          echo '' >> ~/.bashrc
+          echo '# Homebrew' >> ~/.bashrc
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+        fi
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        sudo apt-get install -y build-essential
+        echo "✅ Homebrew installed. Run 'source ~/.bashrc' or restart shell"
 
   08-install_k8s_tools:
+    desc: "Install kubectl, kubectx, kubens, k9s, and kubelogin"
+    deps: [07-install_homebrew]
     cmds:
-      - sudo apt-get update
-      - sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-      - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-      - sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
-      - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-      - sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
-      - sudo apt-get update
-      - sudo apt-get install -y kubectl kubectx
-      - brew install derailed/k9s/k9s
-      - brew install Azure/kubelogin/kubelogin
+      - |
+        # Ensure brew is available
+        if command -v brew &> /dev/null; then
+          eval "$(brew shellenv)"
+        fi
+        
+        KUBECTL_INSTALLED=false
+        KUBECTX_INSTALLED=false
+        KUBENS_INSTALLED=false
+        K9S_INSTALLED=false
+        KUBELOGIN_INSTALLED=false
+        
+        command -v kubectl &> /dev/null && KUBECTL_INSTALLED=true
+        command -v kubectx &> /dev/null && KUBECTX_INSTALLED=true
+        command -v kubens &> /dev/null && KUBENS_INSTALLED=true
+        command -v k9s &> /dev/null && K9S_INSTALLED=true
+        command -v kubelogin &> /dev/null && KUBELOGIN_INSTALLED=true
+        
+        if [ "$KUBECTL_INSTALLED" = true ] && [ "$KUBECTX_INSTALLED" = true ] && [ "$KUBENS_INSTALLED" = true ] && [ "$K9S_INSTALLED" = true ] && [ "$KUBELOGIN_INSTALLED" = true ]; then
+          echo "✅ All k8s tools already installed"
+          kubectl version --client
+          exit 0
+        fi
+        
+        if [ "$KUBECTL_INSTALLED" = false ] || [ "$KUBECTX_INSTALLED" = false ] || [ "$KUBENS_INSTALLED" = false ]; then
+          echo "📦 Installing kubectl, kubectx, and kubens..."
+          sudo apt-get update -qq
+          sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+          sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
+          sudo apt-get update -qq
+          sudo apt-get install -y kubectl kubectx
+        fi
+        
+        [ "$K9S_INSTALLED" = false ] && echo "📦 Installing k9s..." && brew install derailed/k9s/k9s
+        [ "$KUBELOGIN_INSTALLED" = false ] && echo "📦 Installing kubelogin..." && brew install Azure/kubelogin/kubelogin
+        
+        echo "✅ Kubernetes tools installed"
 
   09-connect_aks_dev:
+    desc: "Connect to aks-dev cluster and set cfis as default namespace"
+    deps: [06-install_azure_CLI, 08-install_k8s_tools]
     cmds:
-      - echo "Getting credentials for aks-dev cluster. This will only work if you selected aks-dev when you logged in earlier."
-      - echo "otherwise log in again using az login --use-device-code"
-      - az aks get-credentials -g aks-dev-rg --name aks-dev
-      - echo "Now kubectl and k9s should work "
-      - kubectl get pods -n cfis
-      - echo "Verify the kubectl output and press any key to continue to k9s"
-      - bash -c "read -n 1 -s"
-      - k9s -n cfis
+      - |
+        echo "🔗 Getting credentials for aks-dev cluster..."
+        if ! az account show &> /dev/null; then
+          echo "❌ Not logged into Azure. Run: az login --use-device-code"
+          exit 1
+        fi
+        az aks get-credentials -g aks-dev-rg --name aks-dev
+        echo "✅ Credentials configured. Testing connection..."
+        kubectl get pods -n cfis
+        echo ""
+        echo "📌 Setting default namespace to 'cfis'..."
+        kubectl config set-context --current --namespace=cfis
+        echo "✅ Default namespace set to 'cfis'"
+        echo ""
+        echo "Verify the kubectl output above. Press any key to launch k9s..."
+        read -n 1 -s
+        k9s -n cfis
+
   10-install_intellij:
+    desc: "Download and install latest IntelliJ IDEA Ultimate"
     cmds:
-      - wget https://download.jetbrains.com/idea/ideaIU-2025.1.4.1.tar.gz
-      - mv ideaIU*.tar.gz ~
-      - cd ~ ; tar -xzvf ideaIU*.tar.gz
-      - echo "IntelliJ installed, press enter to launch and log in to activate licence"
-      - bash -c "read -n 1 -s"
-      - ~/idea-IU-*/bin/idea.sh
+      - |
+        if [ -d ~/idea-IU-* ]; then
+          echo "✅ IntelliJ already installed at ~/idea-IU-*"
+          echo "   To launch: ~/idea-IU-*/bin/idea.sh"
+          exit 0
+        fi
+        echo "📦 Fetching latest IntelliJ IDEA version..."
+        cd ~
+        
+        # Remove any existing IntelliJ .tar.gz files to avoid .1, .2, etc. versions
+        rm -f ideaIU-*.tar.gz*
+        
+        # Get the latest version using JetBrains API
+        LATEST_URL=$(curl -s "https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=release" | grep -oP '"linux":\s*{\s*"link":\s*"\K[^"]+' | head -1)
+        
+        if [ -z "$LATEST_URL" ]; then
+          echo "❌ Failed to fetch latest IntelliJ version. Using fallback URL..."
+          LATEST_URL="https://download.jetbrains.com/idea/ideaIU-latest.tar.gz"
+        fi
+        
+        echo "📥 Downloading latest IntelliJ IDEA..."
+        wget --show-progress "$LATEST_URL" -O ideaIU-latest.tar.gz
+        
+        # Verify download
+        if [ ! -s ideaIU-latest.tar.gz ] || [ $(stat -c%s ideaIU-latest.tar.gz) -lt 1000000 ]; then
+          echo "❌ Download failed or file is too small."
+          rm -f ideaIU-latest.tar.gz
+          exit 1
+        fi
+        
+        echo "📂 Extracting IntelliJ IDEA..."
+        tar -xzf ideaIU-latest.tar.gz
+        rm ideaIU-latest.tar.gz
+        
+        echo "✅ IntelliJ installed successfully at ~/idea-IU-*"
+        echo "   To launch and activate license: ~/idea-IU-*/bin/idea.sh"
+
   11-install_node:
+    desc: "Install Node.js via nvm"
     cmds:
-      - sudo apt remove -y nodejs
-      - sudo apt install -y curl
-      - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-      - bash -c '
-          export NVM_DIR="$HOME/.nvm";
-          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh";
-          [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion";
-          nvm install --lts;
-          nvm use --lts;
-          node -v
+      - |
+        if [ -d "$HOME/.nvm" ]; then
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            set +e
+            . "$NVM_DIR/nvm.sh" 2>/dev/null
+            set -e
+          fi
+          if command -v node &> /dev/null; then
+            echo "✅ Node.js already installed: $(node -v)"
+            exit 0
+          fi
+        fi
+        echo "📦 Installing nvm and Node.js..."
+        
+        # Install nvm
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        
+        # Install Node in a clean bash environment
+        bash -c '
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        
+        # Install LTS version
+        nvm install --lts
+        nvm use --lts
+        nvm alias default lts/*
+        
+        echo "✅ Node.js installed successfully: $(node -v)"
+        echo "✅ npm version: $(npm -v)"
         '
-      - echo "nvm and node installation complete. Please verify version above."
+        
+        echo ""
+        echo "⚠️  Run 'source ~/.bashrc' or restart your shell to use nvm/node"
+
+  verify-setup:
+    desc: "Check which tools are installed"
+    cmds:
+      - |
+        echo "=== Development Environment Status ==="
+        echo ""
+        
+        # Chrome
+        if command -v google-chrome &> /dev/null; then
+          echo "✅ Chrome: $(google-chrome --version 2>&1)"
+        else
+          echo "❌ Chrome: Not installed"
+        fi
+        
+        # SDKMAN and Java
+        bash -c '
+        if [ -d "$HOME/.sdkman" ]; then
+          export SDKMAN_DIR="$HOME/.sdkman"
+          [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+          if command -v java &> /dev/null; then
+            echo "✅ Java: $(java -version 2>&1 | head -n1)"
+          else
+            echo "⚠️  SDKMAN installed but no Java version active"
+          fi
+        else
+          echo "❌ SDKMAN: Not installed"
+        fi
+        '
+        
+        # SSH Keys
+        if [ -f ~/.ssh/id_rsa ]; then
+          echo "✅ SSH Keys: Generated"
+        else
+          echo "❌ SSH Keys: Not generated"
+        fi
+        
+        # VSCode
+        if dpkg -l 2>/dev/null | grep "^ii" | awk '{print $2}' | grep -q "^code$"; then
+          VER=$(dpkg -l 2>/dev/null | grep "^ii" | grep -w "code" | awk '{print $3}')
+          echo "✅ VSCode (Linux): $VER"
+        elif command -v code &> /dev/null && [[ $(which code) == /mnt/* ]]; then
+          echo "⚠️  VSCode (Windows only): $(code --version 2>&1 | head -n1)"
+          echo "   Run 'task 04-install_vscode' to install Linux version"
+        else
+          echo "❌ VSCode: Not installed"
+        fi
+        
+        # Docker
+        if command -v docker &> /dev/null; then
+          echo "✅ Docker: $(docker --version 2>&1)"
+        else
+          echo "❌ Docker: Not installed"
+        fi
+        
+        # Azure CLI
+        if command -v az &> /dev/null; then
+          VER=$(az version 2>&1 | grep -oP '"azure-cli": "\K[^"]+' || echo "unknown")
+          echo "✅ Azure CLI: $VER"
+        else
+          echo "❌ Azure CLI: Not installed"
+        fi
+        
+        # Homebrew
+        if command -v brew &> /dev/null; then
+          echo "✅ Homebrew: $(brew --version 2>&1 | head -n1)"
+        else
+          echo "❌ Homebrew: Not installed"
+        fi
+        
+        # kubectl
+        if command -v kubectl &> /dev/null; then
+          VER=$(kubectl version --client 2>&1 | grep -oP 'Client Version: \K.*' || echo "installed")
+          echo "✅ kubectl: $VER"
+        else
+          echo "❌ kubectl: Not installed"
+        fi
+        
+        # k9s
+        if command -v k9s &> /dev/null; then
+          echo "✅ k9s: $(k9s version 2>&1 | grep Version | awk '{print $2}')"
+        else
+          echo "❌ k9s: Not installed"
+        fi
+        
+        # IntelliJ
+        if [ -d ~/idea-IU-* ]; then
+          echo "✅ IntelliJ: Installed at ~/idea-IU-*"
+        else
+          echo "❌ IntelliJ: Not installed"
+        fi
+        
+        # Node.js
+        if [ -d "$HOME/.nvm" ]; then
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            set +e  # Don't exit on error from nvm
+            . "$NVM_DIR/nvm.sh" 2>/dev/null
+            set -e
+          fi
+          if command -v node &> /dev/null; then
+            echo "✅ Node.js: $(node -v 2>&1)"
+          else
+            echo "❌ Node.js: nvm installed but no Node version"
+          fi
+        else
+          echo "❌ Node.js: Not installed"
+        fi
+
+  setup-all:
+    desc: "Run complete setup (all tasks in order)"
+    cmds:
+      - echo "🚀 Starting complete setup..."
+      - echo ""
+      - task: 01-install_chrome
+      - task: 02a-install_sdkman
+      - task: 02-install_java
+      - task: 03-setup_ssh
+      - task: 04-install_vscode
+      - task: 05-install_docker
+      - task: 06-install_azure_CLI
+      - task: 07-install_homebrew
+      - task: 08-install_k8s_tools
+      - task: 10-install_intellij
+      - task: 11-install_node
+      - |
+        echo ""
+        echo "=========================================="
+        echo "✅ Setup complete! All tools installed."
+        echo "=========================================="
+        echo ""
+        echo "⚠️  IMPORTANT: Run 'source ~/.bashrc' or restart your shell to activate:"
+        echo "   - SDKMAN (for Java version management)"
+        echo "   - Homebrew"
+        echo "   - nvm (for Node.js)"
+        echo "   - VSCode WSL-optimized alias"
+        echo ""
+        echo "Optional next steps:"
+        echo "   • task 09-connect_aks_dev - Connect to AKS cluster"
+        echo ""
+        echo "Run 'task verify-setup' to see installation status"
