@@ -91,8 +91,13 @@ fi
 "@
     
     Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
-    # Launch WezTerm with specific distro override (since .wezterm.lua defaults to Ubuntu-CFIS)
-    Start-Process -FilePath $weztermPath -ArgumentList "start", "--", "wsl", "-d", "$desiredDistro"
+    # Just launch WezTerm - it will use the default distro from .wezterm.lua
+    # If testing with a different distro, update .wezterm.lua first or manually launch
+    Start-Process -FilePath $weztermPath -ArgumentList "start"
+    
+    Write-Host ""
+    Write-Host "NOTE: WezTerm will open with the default distro configured in .wezterm.lua" -ForegroundColor Yellow
+    Write-Host "      If testing with $desiredDistro, make sure that's your default distro." -ForegroundColor Yellow
     
     Write-Host ""
     Write-Host "✅ WezTerm launched!" -ForegroundColor Green
