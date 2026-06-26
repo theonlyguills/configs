@@ -119,7 +119,7 @@ tasks:
       - |
         # Check if Linux version is installed (exact package name match)
         if dpkg -l 2>/dev/null | grep "^ii" | awk '{print $2}' | grep -q "^code$"; then
-          VER=$(dpkg -l 2>/dev/null | grep "^ii" | grep -w "code" | awk '{print $3}')
+          VER=$(dpkg-query -W -f='${Version}' code 2>/dev/null)
           echo "✅ VSCode (Linux) already installed: $VER"
           exit 0
         fi
@@ -253,9 +253,9 @@ tasks:
           sudo apt-get update -qq
           sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
           sudo mkdir -p /etc/apt/keyrings
-          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
           sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
           sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
           sudo apt-get update -qq
           sudo apt-get install -y kubectl kubectx
@@ -347,7 +347,7 @@ tasks:
         echo "📦 Installing nvm and Node.js..."
         
         # Install nvm
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
         
         # Install Node in a clean bash environment
         bash -c '
@@ -442,7 +442,10 @@ tasks:
       - |
         echo "=== Development Environment Status ==="
         echo ""
-        
+
+        # Make brew-installed tools (k9s, kubelogin) visible to this diagnostic shell
+        [ -d /home/linuxbrew/.linuxbrew/bin ] && export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+
         # Chrome
         if command -v google-chrome &> /dev/null; then
           echo "✅ Chrome: $(google-chrome --version 2>&1)"
@@ -474,7 +477,7 @@ tasks:
         
         # VSCode
         if dpkg -l 2>/dev/null | grep "^ii" | awk '{print $2}' | grep -q "^code$"; then
-          VER=$(dpkg -l 2>/dev/null | grep "^ii" | grep -w "code" | awk '{print $3}')
+          VER=$(dpkg-query -W -f='${Version}' code 2>/dev/null)
           echo "✅ VSCode (Linux): $VER"
         elif command -v code &> /dev/null && [[ $(which code) == /mnt/* ]]; then
           echo "⚠️  VSCode (Windows only): $(code --version 2>&1 | head -n1)"
