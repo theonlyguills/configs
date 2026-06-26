@@ -131,13 +131,17 @@ if ($LASTEXITCODE -ne 0) {
     Read-Host -Prompt "Press Enter to exit"; exit 1
 }
 
-# Set the password via stdin so it is never interpolated into a shell command
-# line — this passes $, ", backtick, etc. through to chpasswd unharmed.
-$prevEnc       = $OutputEncoding
-$OutputEncoding = New-Object System.Text.UTF8Encoding $false   # no BOM
-("{0}:{1}" -f $wslUser, $wslPass) | wsl -d $desiredDistro -u root chpasswd
-$pwExit         = $LASTEXITCODE
-$OutputEncoding = $prevEnc
+# Set the password via a UTF-8 (no BOM) temp file that chpasswd reads. The
+# password is never interpolated into a shell command line (so $, ", backtick
+# etc. are safe), AND we control the exact bytes: piping through wsl's stdin can
+# fall back to the legacy console code page and corrupt non-ASCII characters
+# (accents, etc.), which then don't match what you type at a UTF-8 prompt.
+$pwFile    = Join-Path $env:TEMP ("wslpw_" + [System.Guid]::NewGuid().ToString("N"))
+[System.IO.File]::WriteAllText($pwFile, ("{0}:{1}`n" -f $wslUser, $wslPass), (New-Object System.Text.UTF8Encoding $false))
+$pwFileWsl = (wsl -d $desiredDistro wslpath -a ($pwFile -replace '\\','/')).Trim()
+wsl -d $desiredDistro -u root bash -c "chpasswd < '$pwFileWsl'"
+$pwExit    = $LASTEXITCODE
+Remove-Item $pwFile -Force -ErrorAction SilentlyContinue
 if ($pwExit -ne 0) {
     Write-Host "Setting password failed" -ForegroundColor Red
     Read-Host -Prompt "Press Enter to exit"; exit 1
