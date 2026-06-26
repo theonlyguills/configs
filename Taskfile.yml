@@ -284,8 +284,8 @@ tasks:
         kubectl config set-context --current --namespace=cfis
         echo "✅ Default namespace set to 'cfis'"
         echo ""
-        echo "Verify the kubectl output above. Press any key to launch k9s..."
-        read -n 1 -s
+        echo "Verify the kubectl output above. Press Enter to launch k9s..."
+        read -r _
         k9s -n cfis
 
   10-install_intellij:

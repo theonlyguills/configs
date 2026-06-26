@@ -9,7 +9,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 $TestMode = $false
 
-$removeGit     = $true
 $desiredDistro = if ($TestMode) { "CFIS-Claude" } else { "Ubuntu-CFIS" }
 $userHome      = $env:USERPROFILE
 
@@ -45,15 +44,12 @@ if (-not $TestMode) {
     Write-Host ""
     Read-Host -Prompt "Press Enter to continue"
 
-    $uninstaller = "C:\Program Files\Git\unins000.exe"
-    if ($removeGit -And (Test-Path $uninstaller)) {
-        Write-Host "Uninstalling old version of Git..."
-        Start-Process -FilePath $uninstaller -Wait
-        Write-Host "Git has been uninstalled."
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Git already installed ($(git --version)). Skipping." -ForegroundColor Green
+    } else {
+        Write-Host "Installing git..."
+        winget install -e --id Git.Git
     }
-
-    Write-Host "Installing git..."
-    winget install -e --id Git.Git
 
     Write-Host "Installing WSL2 components..."
     wsl --set-default-version 2

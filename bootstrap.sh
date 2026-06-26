@@ -32,6 +32,17 @@ echo "alias tl=\"task --list-all\"" >> ~/.bashrc
 echo "alias vi=nvim" >> ~/.bashrc
 echo "alias vim=nvim" >> ~/.bashrc
 
+# Open URLs in Windows Edge so corporate SSO / `az login` works from WSL.
+# The raw msedge.exe path has spaces and (x86) that Python's webbrowser (used
+# by az login) can't parse, so point BROWSER at a no-spaces wrapper instead.
+mkdir -p ~/.local/bin
+cat > ~/.local/bin/edge <<'EOF'
+#!/bin/bash
+exec "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" "$@"
+EOF
+chmod +x ~/.local/bin/edge
+echo 'export BROWSER="$HOME/.local/bin/edge"' >> ~/.bashrc
+
 cd ~/configs
 task
 
