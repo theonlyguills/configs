@@ -1,48 +1,68 @@
-$removeGit = $true
-$desiredDistro = "Ubuntu-CFIS"
-$profile = $env:USERPROFILE
+# ─────────────────────────────────────────────────────────────────────────────
+#  $TestMode: set to $true to exercise this script against a throwaway distro
+#  without touching the real work environment. When $true it:
+#    • targets the Ubuntu-Claude distro instead of Ubuntu-CFIS
+#    • uses hardcoded WSL credentials (claude/claude) instead of prompting
+#    • skips the admin check, the slow Windows installs (git, WSL components,
+#      wezterm) and the copy of .wezterm.lua into the profile
+#  SHIP WITH $TestMode = $false.
+# ─────────────────────────────────────────────────────────────────────────────
+$TestMode = $false
 
-Set-Location $profile
+$removeGit     = $true
+$desiredDistro = if ($TestMode) { "Ubuntu-Claude" } else { "Ubuntu-CFIS" }
+$userHome      = $env:USERPROFILE
 
-# Check for administrator privileges
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
-    [Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "This script must be run as Administrator."
-    exit 1
+Set-Location $userHome
+
+# Check for administrator privileges (skipped in test mode, which does no
+# machine-wide installs).
+if (-not $TestMode) {
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+        [Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Warning "This script must be run as Administrator."
+        exit 1
+    }
 }
 
-Write-Host ""
-Write-Host " * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * "
-Write-Host ""
-Write-Host "Make sure to get latest intel GFX drivers and install them" -ForegroundColor Yellow
-Write-Host "using privilege management before running this script." -ForegroundColor Yellow
-Write-Host ""
-Write-Host " * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * "
-Write-Host ""
-
-Write-Host "Available at https://www.intel.com/content/www/us/en/download/19344/intel-graphics-windows-dch-drivers.html"
-Write-Host ""
-
-Read-Host -Prompt "Press Enter to continue"
-
-$uninstaller = "C:\Program Files\Git\unins000.exe"
-
-if ($removeGit -And (Test-Path $uninstaller)) {
-    Write-Host "Uninstalling old version of Git..."
-    Start-Process -FilePath $uninstaller -Wait
-    Write-Host "Git has been uninstalled."
+if ($TestMode) {
+    Write-Host ""
+    Write-Host "  [ TEST MODE ] target distro: $desiredDistro" -ForegroundColor Magenta
+    Write-Host "  Windows installs + admin check skipped; credentials hardcoded." -ForegroundColor Magenta
+    Write-Host ""
 }
 
-Write-Host "Installing git..."
-winget install -e --id Git.Git
+if (-not $TestMode) {
+    Write-Host ""
+    Write-Host " * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * "
+    Write-Host ""
+    Write-Host "Make sure to get latest intel GFX drivers and install them" -ForegroundColor Yellow
+    Write-Host "using privilege management before running this script." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host " * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * "
+    Write-Host ""
+    Write-Host "Available at https://www.intel.com/content/www/us/en/download/19344/intel-graphics-windows-dch-drivers.html"
+    Write-Host ""
+    Read-Host -Prompt "Press Enter to continue"
 
-Write-Host "Installing WSL2 components..."
-wsl --set-default-version 2
-wsl --install --web-download --no-distribution
-wsl --update --web-download
+    $uninstaller = "C:\Program Files\Git\unins000.exe"
+    if ($removeGit -And (Test-Path $uninstaller)) {
+        Write-Host "Uninstalling old version of Git..."
+        Start-Process -FilePath $uninstaller -Wait
+        Write-Host "Git has been uninstalled."
+    }
 
-Write-Host "Please ensure the success of the above WSL2 install before continuing... "
-Read-Host -Prompt "Press Enter to continue"
+    Write-Host "Installing git..."
+    winget install -e --id Git.Git
+
+    Write-Host "Installing WSL2 components..."
+    wsl --set-default-version 2
+    wsl --install --web-download --no-distribution
+    wsl --update --web-download
+
+    Write-Host "Please ensure the success of the above WSL2 install before continuing... "
+    Read-Host -Prompt "Press Enter to continue"
+}
 
 $installedDistros = wsl --list --quiet
 
@@ -53,110 +73,132 @@ else {
     Write-Host "Installing $desiredDistro..." -ForegroundColor Yellow
     wsl --install -d Ubuntu-24.04 --name $desiredDistro --no-launch
     Write-Host ""
-    Write-Host "Ubuntu installed successfully!" -ForegroundColor Green
-    Write-Host "On first launch, you'll create your username and password." -ForegroundColor Yellow
+    Write-Host "$desiredDistro registered successfully!" -ForegroundColor Green
 }
 
-Write-Host ""
-Write-Host "Installing wezterm..."
-winget install -e --id wez.wezterm
+if (-not $TestMode) {
+    Write-Host ""
+    Write-Host "Installing wezterm..."
+    winget install -e --id wez.wezterm
+}
 
 Write-Host "Cloning config repo into home"
-Set-Location "$env:USERPROFILE"
+Set-Location $userHome
 if (Test-Path "configs") {
     Write-Host "configs folder already exists, skipping clone" -ForegroundColor Yellow
 } else {
     git clone https://github.com/theonlyguills/configs
 }
 
-Write-Host "Copying wezterm defaults... "
-Copy-Item -Path configs\.wezterm.lua -Destination $profile\.wezterm.lua -Force
-
-# Check if WSL user has been created (distro has been initialized)
-$userCreated = wsl -d $desiredDistro test -d /home 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host "  WSL Initial Setup Required" -ForegroundColor Cyan
-    Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "WezTerm will now open for you to create your WSL username and password." -ForegroundColor Yellow
-    Write-Host "After creating your account, the window will close automatically." -ForegroundColor Yellow
-    Write-Host ""
-    Read-Host -Prompt "Press Enter to launch WezTerm for initial setup"
-    
-    # Launch WezTerm for initial user setup - it will close when setup completes
-    $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
-    # Launch WezTerm - it will use the default distro from .wezterm.lua
-    & $weztermPath start
-    
-    # Wait for user to complete setup
-    Write-Host ""
-    Write-Host "After you finish creating your user (username and password)," -ForegroundColor Yellow
-    Write-Host "the window will close. Then we'll continue with automated setup." -ForegroundColor Yellow
-    Read-Host -Prompt "Press Enter after you've created your user and the window closed"
+if (-not $TestMode) {
+    Write-Host "Copying wezterm defaults... "
+    Copy-Item -Path configs\.wezterm.lua -Destination $userHome\.wezterm.lua -Force
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Provision the WSL user deterministically, as root, on the freshly-registered
+#  (uninitialized) distro. This runs before any interactive launch, so Ubuntu's
+#  OOBE (username/password prompt) never fires.
+# ─────────────────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  Running Automated Linux Setup" -ForegroundColor Cyan  
+Write-Host "  Provisioning WSL user" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
-# Download bootstrap.sh to WSL (simpler and more reliable than wslpath conversion)
-Write-Host "Preparing bootstrap script..." -ForegroundColor Yellow
-
-# Try local copy first if configs exists
-$localScript = "$env:USERPROFILE\configs\bootstrap.sh"
-if (Test-Path $localScript) {
-    Write-Host "Using local bootstrap.sh from configs folder..." -ForegroundColor Green
-    # Copy directly via WSL file access
-    wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/bootstrap.sh /tmp/bootstrap.sh 2>/dev/null && cp /tmp/bootstrap.sh ~ && chmod +x ~/bootstrap.sh" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Local copy successful" -ForegroundColor Green
-    } else {
-        Write-Host "Local copy failed, downloading from GitHub..." -ForegroundColor Yellow
-        wsl -d $desiredDistro bash -c "wget -q https://raw.githubusercontent.com/theonlyguills/configs/refs/heads/master/bootstrap.sh -O /tmp/bootstrap.sh && cp /tmp/bootstrap.sh ~ && chmod +x ~/bootstrap.sh"
-    }
+if ($TestMode) {
+    Write-Host "[TestMode] Using hardcoded WSL credentials claude/claude" -ForegroundColor Magenta
+    $wslUser = "claude"
+    $wslPass = "claude"
 } else {
-    Write-Host "configs folder not found, downloading from GitHub..." -ForegroundColor Yellow
-    wsl -d $desiredDistro bash -c "wget -q https://raw.githubusercontent.com/theonlyguills/configs/refs/heads/master/bootstrap.sh -O /tmp/bootstrap.sh && cp /tmp/bootstrap.sh ~ && chmod +x ~/bootstrap.sh"
+    $cred    = Get-Credential -Message "Choose your WSL username & password"
+    $wslUser = $cred.UserName
+    $wslPass = $cred.GetNetworkCredential().Password
 }
 
-# Verify the script exists
-wsl -d $desiredDistro test -f ~/bootstrap.sh
+Write-Host "Creating user '$wslUser' as root..." -ForegroundColor Yellow
+
+# Create the account, grant sudo, set it as the distro default user, and drop in
+# a TEMPORARY passwordless-sudo rule so the unattended apt/curl steps in
+# bootstrap.sh don't stall waiting for a password. The rule is removed below.
+$provision = @"
+set -e
+useradd -m -s /bin/bash '$wslUser'
+usermod -aG sudo '$wslUser'
+printf '[user]\ndefault=%s\n' '$wslUser' > /etc/wsl.conf
+echo '$wslUser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-bootstrap
+chmod 440 /etc/sudoers.d/99-bootstrap
+"@
+wsl -d $desiredDistro -u root bash -c $provision
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Failed to prepare bootstrap script" -ForegroundColor Red
-    Read-Host -Prompt "Press Enter to exit"
-    exit 1
+    Write-Host "User provisioning failed" -ForegroundColor Red
+    Read-Host -Prompt "Press Enter to exit"; exit 1
 }
 
-Write-Host "✅ Bootstrap script ready" -ForegroundColor Green
+# Set the password via stdin so it is never interpolated into a shell command
+# line — this passes $, ", backtick, etc. through to chpasswd unharmed.
+$prevEnc       = $OutputEncoding
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false   # no BOM
+("{0}:{1}" -f $wslUser, $wslPass) | wsl -d $desiredDistro -u root chpasswd
+$pwExit         = $LASTEXITCODE
+$OutputEncoding = $prevEnc
+if ($pwExit -ne 0) {
+    Write-Host "Setting password failed" -ForegroundColor Red
+    Read-Host -Prompt "Press Enter to exit"; exit 1
+}
+
+# Apply /etc/wsl.conf so the default user takes effect on the next start.
+wsl --terminate $desiredDistro
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Stage bootstrap.sh into WSL and run it synchronously, as the user. The path
+#  is resolved with wslpath (no hardcoded /mnt/c), so it works regardless of
+#  where the Windows profile actually lives.
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  Running Automated Linux Setup" -ForegroundColor Cyan
+Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
-# Launch wezterm with the bootstrap script
-Write-Host "Adding bootstrap auto-run to .bashrc..." -ForegroundColor Yellow
+# Use forward slashes: backslashes get stripped passing through wsl.exe args.
+$winScriptFwd = ($userHome -replace '\\','/') + '/configs/bootstrap.sh'
+$wslScript = (wsl -d $desiredDistro wslpath -a "$winScriptFwd").Trim()
+wsl -d $desiredDistro -u $wslUser bash -c "cp '$wslScript' ~/bootstrap.sh && sed -i 's/\r`$//' ~/bootstrap.sh && chmod +x ~/bootstrap.sh"
 
-# Copy the script and convert line endings with sed (dos2unix might not be installed)
-wsl -d $desiredDistro bash -c "cp /mnt/c/Users/$env:USERNAME/configs/add-bootstrap-to-bashrc.sh /tmp/ && sed -i 's/\r$//' /tmp/add-bootstrap-to-bashrc.sh && bash /tmp/add-bootstrap-to-bashrc.sh"
+# Verify it landed (errors are NOT silenced).
+wsl -d $desiredDistro -u $wslUser bash -c "test -f ~/bootstrap.sh"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to stage bootstrap.sh" -ForegroundColor Red
+    Read-Host -Prompt "Press Enter to exit"; exit 1
+}
+Write-Host "bootstrap.sh staged." -ForegroundColor Green
 
-Write-Host "Launching WezTerm (bootstrap will run automatically)..." -ForegroundColor Yellow
+# Run it in this window — visible output, real exit code.
+wsl -d $desiredDistro -u $wslUser bash -c "bash ~/bootstrap.sh"
+$bootstrapExit = $LASTEXITCODE
+if ($bootstrapExit -ne 0) {
+    Write-Host "Bootstrap failed (exit $bootstrapExit)" -ForegroundColor Red
+}
+
+# Remove the temporary passwordless-sudo rule.
+wsl -d $desiredDistro -u root rm -f /etc/sudoers.d/99-bootstrap
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Open WezTerm for normal use. No auto-run, no .bashrc injection — the distro
+#  is already fully provisioned and opens as the created user.
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host ""
 $weztermPath = "C:\Program Files\WezTerm\wezterm.exe"
-
 if (Test-Path $weztermPath) {
-    # Just launch WezTerm - it will use the default distro from .wezterm.lua
     Start-Process -FilePath $weztermPath -ArgumentList "start"
-    
-    Write-Host ""
-    Write-Host "✅ WezTerm launched!" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "The terminal window will run the setup script automatically."
-    Write-Host "Follow the prompts in that window to complete the setup."
-    Write-Host ""
-    Write-Host "This PowerShell window can now be closed." -ForegroundColor Cyan
+    Write-Host "WezTerm launched." -ForegroundColor Green
 } else {
-    Write-Host "❌ WezTerm not found at expected location" -ForegroundColor Red
-    Write-Host "Please run bootstrap.sh manually in WSL:" -ForegroundColor Yellow
-    Write-Host "  wsl -d $desiredDistro" -ForegroundColor Yellow
-    Write-Host "  ~/bootstrap.sh" -ForegroundColor Yellow
+    Write-Host "WezTerm not found at $weztermPath." -ForegroundColor Yellow
+    Write-Host "Open your shell with:  wsl -d $desiredDistro" -ForegroundColor Yellow
+}
+
+if ($bootstrapExit -eq 0) {
+    Write-Host ""
+    Write-Host "Setup complete - usable shell as '$wslUser' in $desiredDistro." -ForegroundColor Green
 }

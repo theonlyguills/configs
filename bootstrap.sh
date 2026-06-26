@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Remove the auto-run marker from .bashrc (cleanup from PowerShell bootstrap)
-if grep -q '# BOOTSTRAP_AUTO_RUN' ~/.bashrc 2>/dev/null; then
-    sed -i '/# BOOTSTRAP_AUTO_RUN/,/^fi$/d' ~/.bashrc
-fi
-
 # Install neovim
 cd ~
 echo "Installing neovim, you will have to enter your password to sudo"
@@ -19,8 +14,8 @@ git clone https://github.com/theonlyguills/configs
 mkdir ~/.config
 cp ~/configs/nvim ~/.config -r
 
-sudo apt update
-sudo apt install ripgrep
+sudo apt-get update
+sudo apt-get install -y ripgrep
 
 echo "Installing taskfile"
 sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
@@ -30,8 +25,6 @@ echo "alias t=task" >> ~/.bashrc
 echo "alias tl=\"task --list-all\"" >> ~/.bashrc
 echo "alias vi=nvim" >> ~/.bashrc
 echo "alias vim=nvim" >> ~/.bashrc
-
-source ~/.bashrc
 
 cd ~/configs
 task
