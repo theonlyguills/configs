@@ -10,7 +10,7 @@
 $TestMode = $false
 
 $removeGit     = $true
-$desiredDistro = if ($TestMode) { "Ubuntu-Claude" } else { "Ubuntu-CFIS" }
+$desiredDistro = if ($TestMode) { "CFIS-Claude" } else { "Ubuntu-CFIS" }
 $userHome      = $env:USERPROFILE
 
 Set-Location $userHome
@@ -125,7 +125,7 @@ $provision = @"
 set -e
 useradd -m -s /bin/bash '$wslUser'
 usermod -aG sudo '$wslUser'
-printf '[user]\ndefault=%s\n' '$wslUser' > /etc/wsl.conf
+printf '[boot]\nsystemd=true\n\n[user]\ndefault=%s\n' '$wslUser' > /etc/wsl.conf
 echo '$wslUser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-bootstrap
 chmod 440 /etc/sudoers.d/99-bootstrap
 "@
